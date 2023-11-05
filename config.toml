@@ -1,0 +1,3 @@
+www_root = "./www"
+port = 7879
+local = true
