@@ -1,8 +1,30 @@
 <html>
+
 <head>
     <title>Eslzzyl's Image bed</title>
+    <style>
+        .container {
+            max-height: 100vh;
+            width: 80vw;
+            overflow-y: auto;
+            margin: 0 auto;
+            text-align: center;
+        }
+    </style>
 </head>
+
 <body>
-    <h1>Eslzzyl's Image bed</h1>
+    <div class="container">
+        <h1>简易图床</h1>
+        <a href="https://github.com/Eslzzyl/imagebed">
+            https://github.com/Eslzzyl/imagebed
+        </a>
+        <div style="text-align: left;">
+            <h2>使用方法</h2>
+            <p>向 UPLOAD 发 POST 请求，请求体携带你想上传的文件。你会在响应体中得到该文件的链接。</p>
+            <p>文件不得大于5MB。</p>
+        </div>
+    </div>
 </body>
+
 </html>

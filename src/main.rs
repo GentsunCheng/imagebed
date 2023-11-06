@@ -24,11 +24,52 @@ use crate::config::Config;
 #[derive(Clone, Debug)]
 struct AppState {
     www_root: String,
+    ssl: bool,
+    host: String,
+    port: u16,
+    proxy: bool,
+}
+
+/// # get_time
+/// 
+/// 用于获取系统时间。
+/// 
+/// 返回的是从 1970-01-01 00:00:00 UTC 起到现在的秒数。
+fn get_time() -> u64 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs()
+}
+
+fn shorten(input: &str) -> String {
+    assert_eq!(input.len(), 64);
+    let (left_half, right_half) = input.split_at(32);
+
+    let left = u128::from_str_radix(left_half, 16).unwrap();
+    let right = u128::from_str_radix(right_half, 16).unwrap();
+    let result = left.wrapping_add(right);
+
+    format!("{:x}", result)
 }
 
 #[get("/")]
 async fn index(data: web::Data<AppState>) -> impl Responder {
     let www_root = &data.www_root;
+    let host = &data.host;
+    let port = &data.port;
+    let ssl = &data.ssl;
+    let proxy = &data.proxy;
+
+    let protocol = match ssl {
+        true => "https".to_string(),
+        false => "http".to_string(),
+    };
+    let request_url = match proxy {
+        true => format!("{}://{}/upload", protocol, host),
+        false => format!("{}://{}:{}/upload", protocol, host, port),
+    };
+
     let index_path = format!("{}/index.html", www_root);
     let mut index_file = File::open(&index_path)
         .map_err(|e| {
@@ -40,6 +81,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     index_file
         .read_to_string(&mut index_content)
         .expect("Couldn't read index.html!");
+    let index_content = index_content.replace("UPLOAD", &request_url);
 
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -95,6 +137,10 @@ async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> imp
 #[post("/upload")]
 async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl Responder {
     let www_root = &data.www_root;
+    let ssl = &data.ssl;
+    let host = &data.host;
+    let port = &data.port;
+    let proxy = &data.proxy;
 
     // 生成一个唯一的文件名（基于文件内容的哈希值）
     let mut hasher = Sha256::new();
@@ -119,17 +165,14 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
         }
     }
 
-    // 获取当前时间
-    let timestamp = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
-    hasher.update(timestamp.to_string().as_bytes());
+    hasher.update(get_time().to_string().as_bytes());
 
     let file_hash = hasher.finalize();
+    let file_hash_str = format!("{:x}", file_hash);
+    let shortened_file_hash_str = shorten(&file_hash_str);
 
     // 构建文件保存路径
-    let file_name = format!("{:x}.{}", file_hash, file_extension);
+    let file_name = format!("{}.{}", shortened_file_hash_str, file_extension);
     let file_path = format!("{}/file/{}", www_root, file_name);
     // 保存文件
     let mut file = web::block(move || {
@@ -150,7 +193,15 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
     }
 
     // 返回文件的独一无二的URL（使用哈希值）
-    let file_url = format!("http://localhost:7879/{}", file_name);
+    let protocol = match ssl {
+        true => "https".to_string(),
+        false => "http".to_string(),
+    };
+    let file_url = match proxy {
+        true => format!("{}://{}/{}", protocol, host, file_name),
+        false => format!("{}://{}:{}/{}", protocol, host, port, file_name),
+    };
+
     HttpResponse::Ok()
         .body(file_url)
 }
@@ -160,13 +211,16 @@ async fn main() -> std::io::Result<()> {
     // 加载配置文件
     let config = Config::from_toml("./config.toml");
     let www_root = config.www_root().to_string();
+    let ssl = config.ssl();
+    let host = config.host().to_string();
+    let proxy = config.proxy();
     let port = config.port();
     let listen_ip = match config.local() {
         true => "127.0.0.1".to_string(),
         false => "0.0.0.0".to_string(),
     };
 
-    let app_state = AppState { www_root };
+    let app_state = AppState { www_root, ssl, host, port, proxy };
 
     HttpServer::new(move || {
         App::new()

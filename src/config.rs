@@ -16,6 +16,9 @@ use serde_derive::Serialize;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     www_root: String,
+    proxy: bool,
+    ssl: bool,
+    host: String,
     port: u16,
     local: bool,
 }
@@ -24,7 +27,10 @@ impl Config {
     /// 产生一个默认的`Config`对象
     pub fn new() -> Self {
         Self {
-            www_root: '.'.to_string(),
+            www_root: ".".to_string(),
+            proxy: false,
+            ssl: false,
+            host: "localhost".to_string(),
             port: 7879,
             local: true,
         }
@@ -62,6 +68,25 @@ impl Config {
     /// 获取 WWW root
     pub fn www_root(&self) -> &str {
         &self.www_root
+    }
+
+    /// 是否使用反向代理
+    /// 
+    /// 如果为true，则返回URL中不会带端口号；如果为false，则会带端口号。
+    pub fn proxy(&self) -> bool {
+        self.proxy
+    }
+
+    /// 是否使用SSL
+    /// 
+    /// 会决定返回的URL使用http还是https
+    pub fn ssl(&self) -> bool {
+        self.ssl
+    }
+
+    /// 获取主机名（用于返回URL）
+    pub fn host(&self) -> &str {
+        &self.host
     }
 
     /// 获取监听端口号

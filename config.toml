@@ -1,3 +1,6 @@
 www_root = "./www"
+proxy = false
+ssl = false
+host = "localhost"
 port = 7879
 local = true
