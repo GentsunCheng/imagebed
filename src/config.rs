@@ -21,6 +21,7 @@ pub struct Config {
     host: String,
     port: u16,
     local: bool,
+    max_file_size: usize,
 }
 
 impl Config {
@@ -33,6 +34,7 @@ impl Config {
             host: "localhost".to_string(),
             port: 7879,
             local: true,
+            max_file_size: 5 * 1024 * 1024,
         }
     }
 
@@ -53,13 +55,14 @@ impl Config {
             Err(e) => panic!("Error Reading file: {}", e)
         };
         // 尝试读配置文件，若成功则返回，若失败则返回默认值
-        let raw_config = match toml::from_str(&str_val) {
+        let mut raw_config = match toml::from_str(&str_val) {
             Ok(t) => t,
             Err(_) => {
                 println!("无法成功从配置文件构建配置对象，使用默认配置");
                 Config::new()
             }
         };
+        raw_config.max_file_size *= 1024 * 1024;
         raw_config
     }
 }
@@ -97,5 +100,9 @@ impl Config {
     /// 检查服务是否工作在内网
     pub fn local(&self) -> bool {
         self.local
+    }
+
+    pub fn max_file_size(&self) -> usize {
+        self.max_file_size
     }
 }

@@ -4,3 +4,4 @@ ssl = false
 host = "localhost"
 port = 7879
 local = true
+max_file_size = 5

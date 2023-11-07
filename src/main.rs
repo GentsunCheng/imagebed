@@ -1,12 +1,12 @@
 mod config;
 mod util;
 
+use log::{error, info};
 use std::{
     fs::{self, File},
     io::{Read, Write},
     path::Path,
 };
-use log::{error, info};
 
 use actix_multipart::Multipart;
 use actix_web::{
@@ -47,6 +47,8 @@ async fn main() -> std::io::Result<()> {
         false => "0.0.0.0".to_string(),
     };
     info!("Listen IP: {}", &listen_ip);
+    let max_file_size = config.max_file_size();
+    info!("Max file size: {}", format_file_size(max_file_size));
 
     let app_state = AppState {
         www_root,
@@ -54,6 +56,7 @@ async fn main() -> std::io::Result<()> {
         host,
         port,
         proxy,
+        max_file_size,
     };
 
     let server = match HttpServer::new(move || {
@@ -63,11 +66,13 @@ async fn main() -> std::io::Result<()> {
             .service(get_file)
             .service(upload_file)
             .service(delete_file)
-    }).bind((listen_ip, port)) {
+    })
+    .bind((listen_ip, port))
+    {
         Ok(s) => {
             info!("Server established successfully");
             s
-        },
+        }
         Err(e) => {
             error!("Error happened when establishing server: {}", e);
             panic!();
@@ -84,6 +89,7 @@ struct AppState {
     host: String,
     port: u16,
     proxy: bool,
+    max_file_size: usize,
 }
 
 #[get("/")]
@@ -176,10 +182,12 @@ async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> imp
 #[post("/upload")]
 async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl Responder {
     let www_root = &data.www_root;
-    let ssl = &data.ssl;
+    let ssl = data.ssl;
     let host = &data.host;
-    let port = &data.port;
-    let proxy = &data.proxy;
+    let port = data.port;
+    let proxy = data.proxy;
+    let max_file_size = data.max_file_size;
+    let max_file_size_str = format_file_size(max_file_size);
 
     // 生成一个唯一的文件名（基于文件内容的哈希值）
     let mut hasher = Sha256::new();
@@ -188,8 +196,9 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
     while let Some(item) = payload.next().await {
         match item {
             Ok(mut field) => {
-                let content_type = field.content_disposition();
-                let file_name = content_type.get_filename().unwrap_or("unknown");
+                let cd = field.content_disposition();
+                let file_name = cd.get_filename().unwrap_or("unknown");
+
                 file_extension = Path::new(file_name)
                     .extension()
                     .and_then(std::ffi::OsStr::to_str)
@@ -198,6 +207,16 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
                 while let Some(chunk) = field.next().await {
                     file_content.extend_from_slice(&chunk.unwrap());
                     hasher.update(&file_content);
+                }
+                let file_size = file_content.len();
+                let file_size_str = format_file_size(file_size);
+                info!("The file size is {}", &file_size_str);
+                if file_size > max_file_size {
+                    error!("The file size is too large, refused.");
+                    return HttpResponse::BadRequest().body(format!(
+                        "The file size is too large (got {}, expected less than {}).",
+                        &file_size_str, &max_file_size_str
+                    ));
                 }
             }
             Err(_) => return HttpResponse::InternalServerError().finish(),

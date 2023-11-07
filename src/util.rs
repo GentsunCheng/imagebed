@@ -25,3 +25,23 @@ pub fn shorten(input: &str) -> String {
 
     format!("{:x}", result)
 }
+
+/// # 格式化文件大小
+/// 
+/// ## 参数
+/// - `size`: 以字节为单位的文件大小
+/// 
+/// ## 返回
+/// - 格式化后的文件大小，原始大小的单位将被动态地调整到`B`、`KB`、`MB`、`GB`、`TB`等单位，并保留1位小数。
+pub fn format_file_size(size: usize) -> String {
+    let units = ["B", "KB", "MB", "GB", "TB"];
+    let mut size = size as f64;
+    let mut unit_index = 0;
+
+    while size >= 1024.0 && unit_index < units.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+
+    format!("{:.1} {}", size, units[unit_index])
+}
