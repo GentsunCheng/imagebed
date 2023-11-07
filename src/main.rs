@@ -1,13 +1,13 @@
 mod config;
+mod util;
 
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{Read, Write},
     path::Path,
-    time::SystemTime,
 };
+use log::{error, info};
 
-use futures_util::stream::StreamExt;
 use actix_multipart::Multipart;
 use actix_web::{
     get,
@@ -16,10 +16,66 @@ use actix_web::{
     web::{self, Bytes},
     App, HttpResponse, HttpServer, Responder,
 };
+use futures_util::stream::StreamExt;
+use log4rs;
 use new_mime_guess;
-use sha2::{Sha256, Digest};
+use serde_derive::Deserialize;
+use sha2::{Digest, Sha256};
 
 use crate::config::Config;
+use crate::util::*;
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    // 初始化日志系统
+    log4rs::init_file("config/log4rs.yaml", Default::default()).unwrap();
+
+    // 加载配置文件
+    let config = Config::from_toml("config/config.toml");
+    let www_root = config.www_root().to_string();
+    info!("www_root: {}", &www_root);
+    let ssl = config.ssl();
+    info!("Use SSL: {}", ssl);
+    let host = config.host().to_string();
+    info!("Host: {}", &host);
+    let proxy = config.proxy();
+    info!("Use reverse proxy: {}", proxy);
+    let port = config.port();
+    info!("Listen port: {}", port);
+    let listen_ip = match config.local() {
+        true => "127.0.0.1".to_string(),
+        false => "0.0.0.0".to_string(),
+    };
+    info!("Listen IP: {}", &listen_ip);
+
+    let app_state = AppState {
+        www_root,
+        ssl,
+        host,
+        port,
+        proxy,
+    };
+
+    let server = match HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(app_state.clone()))
+            .service(index)
+            .service(get_file)
+            .service(upload_file)
+            .service(delete_file)
+    }).bind((listen_ip, port)) {
+        Ok(s) => {
+            info!("Server established successfully");
+            s
+        },
+        Err(e) => {
+            error!("Error happened when establishing server: {}", e);
+            panic!();
+        }
+    };
+
+    server.run().await
+}
 
 #[derive(Clone, Debug)]
 struct AppState {
@@ -28,29 +84,6 @@ struct AppState {
     host: String,
     port: u16,
     proxy: bool,
-}
-
-/// # get_time
-/// 
-/// 用于获取系统时间。
-/// 
-/// 返回的是从 1970-01-01 00:00:00 UTC 起到现在的秒数。
-fn get_time() -> u64 {
-    SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs()
-}
-
-fn shorten(input: &str) -> String {
-    assert_eq!(input.len(), 64);
-    let (left_half, right_half) = input.split_at(32);
-
-    let left = u128::from_str_radix(left_half, 16).unwrap();
-    let right = u128::from_str_radix(right_half, 16).unwrap();
-    let result = left.wrapping_add(right);
-
-    format!("{:x}", result)
 }
 
 #[get("/")]
@@ -82,6 +115,8 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
         .read_to_string(&mut index_content)
         .expect("Couldn't read index.html!");
     let index_content = index_content.replace("UPLOAD", &request_url);
+
+    info!("Request for / OK");
 
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -129,6 +164,8 @@ async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> imp
         .first()
         .unwrap();
 
+    info!("Request for {} OK. MIME is {}.", &filename, &guess);
+
     HttpResponse::Ok()
         .insert_header(ContentType(guess))
         .body(Bytes::from(file_content))
@@ -160,7 +197,7 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
                     file_content.extend_from_slice(&chunk.unwrap());
                     hasher.update(&file_content);
                 }
-            },
+            }
             Err(_) => return HttpResponse::InternalServerError().finish(),
         }
     }
@@ -176,10 +213,12 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
     let file_path = format!("{}/file/{}", www_root, file_name);
     // 保存文件
     let mut file = web::block(move || {
-        File::create(&file_path).map_err(|e| {
-            eprintln!("Error creating file: {:?}", e);
-            HttpResponse::InternalServerError().finish()
-        }).unwrap()
+        File::create(&file_path)
+            .map_err(|e| {
+                eprintln!("Error creating file: {:?}", e);
+                HttpResponse::InternalServerError().finish()
+            })
+            .unwrap()
     })
     .await
     .unwrap();
@@ -192,7 +231,7 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
         }
     }
 
-    // 返回文件的独一无二的URL（使用哈希值）
+    // 返回URL（使用哈希值）
     let protocol = match ssl {
         true => "https".to_string(),
         false => "http".to_string(),
@@ -202,34 +241,40 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
         false => format!("{}://{}:{}/{}", protocol, host, port, file_name),
     };
 
-    HttpResponse::Ok()
-        .body(file_url)
+    info!("Upload file {} saved. URL is {}.", &file_name, &file_url);
+
+    HttpResponse::Ok().body(file_url)
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    // 加载配置文件
-    let config = Config::from_toml("./config.toml");
-    let www_root = config.www_root().to_string();
-    let ssl = config.ssl();
-    let host = config.host().to_string();
-    let proxy = config.proxy();
-    let port = config.port();
-    let listen_ip = match config.local() {
-        true => "127.0.0.1".to_string(),
-        false => "0.0.0.0".to_string(),
-    };
+#[derive(Deserialize)]
+struct DeleteRequest {
+    file: String,
+}
 
-    let app_state = AppState { www_root, ssl, host, port, proxy };
+#[post("/delete")]
+async fn delete_file(
+    data: web::Data<AppState>,
+    req_body: web::Json<DeleteRequest>,
+) -> impl Responder {
+    let www_root = &data.www_root;
+    let filename = &req_body.file;
 
-    HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(app_state.clone()))
-            .service(index)
-            .service(get_file)
-            .service(upload_file)
-    })
-    .bind((listen_ip, port))?
-    .run()
-    .await
+    let path = format!("{}/file/{}", www_root, filename);
+
+    if Path::new(&path).exists() {
+        match fs::remove_file(&path) {
+            Ok(_) => {
+                info!("File {} deleted.", &filename);
+                return HttpResponse::Ok().body(format!("{} deleted", filename));
+            }
+            Err(err) => {
+                info!("Internal error when deleting file {}.", &filename);
+                return HttpResponse::InternalServerError()
+                    .body(format!("Error deleting file {}: {:?}", filename, err));
+            }
+        }
+    } else {
+        info!("File {} not fount when trying to delete it.", &filename);
+        return HttpResponse::NotFound().body(format!("{} not found", filename));
+    }
 }
