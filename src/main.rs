@@ -141,6 +141,8 @@ async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> imp
                 Err(_) => "<h1>404 Not Found</h1>".as_bytes().to_vec(),
             };
 
+            info!("File {} not fount when trying to access it.", &filename);
+
             return HttpResponse::NotFound()
                 .content_type("text/html; charset=utf-8")
                 .body(Bytes::from(not_found_content));
