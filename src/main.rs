@@ -313,6 +313,11 @@ async fn delete_file(
     let www_root = &data.www_root;
     let filename = &req_body.file;
 
+    if filename.is_empty() {
+        return HttpResponse::BadRequest()
+            .body("Please do not send blank file name");
+    }
+
     let path = format!("{}/file/{}", www_root, filename);
 
     if Path::new(&path).exists() {
