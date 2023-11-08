@@ -113,9 +113,15 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
         true => "https".to_string(),
         false => "http".to_string(),
     };
-    let request_url = match proxy {
-        true => format!("{}://{}/upload", protocol, host),
-        false => format!("{}://{}:{}/upload", protocol, host, port),
+    let (request_url, delete_url) = match proxy {
+        true => (
+            format!("{}://{}/upload", protocol, host),
+            format!("{}://{}/delete", protocol, host)
+        ),
+        false => (
+            format!("{}://{}:{}/upload", protocol, host, port),
+            format!("{}://{}:{}/delete", protocol, host, port)
+        ),
     };
 
     let index_path = format!("{}/index.html", www_root);
@@ -137,6 +143,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     let index_content = index_content.replace("TOTAL_SIZE", &total_size_str);
     let index_content = index_content.replace("MAX_SIZE", &max_file_size_str);
     let index_content = index_content.replace("TOTAL_COUNT", &total_count.to_string());
+    let index_content = index_content.replace("DELETE", &delete_url);
 
     info!("Request for index is OK");
 

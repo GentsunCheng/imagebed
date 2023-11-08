@@ -31,6 +31,26 @@
                 <p>文件不得大于 MAX_SIZE 。</p>
             </div>
             <div>
+                <h2>删除文件</h2>
+                <p>你获得的文件哈希是你对该文件所有权的唯一证明。你可以通过提供文件名来要求服务器删除它。</p>
+                <form id="deleteForm">
+                    <input id="deleteInput">
+                    <button type="button" onclick="deleteFile()">删除</button>
+                    <br>
+                    <span id="deletePrompt"></span>
+                </form>
+            </div>
+            <div>
+                <h2>通过脚本删除文件</h2>
+                <p>向 DELETE 发 POST 请求，请求体携带你想删除的文件名，按照如下格式：</p>
+                <code>
+                    {
+                        "file": "example.jpg"
+                    }
+                </code>
+                <p>服务器回复 200 OK，表示文件已经成功删除；回复 404，表示你提供的文件找不到。</p>
+            </div>
+            <div>
                 <h2>状态</h2>
                 <p>当前文件仓库总体积：TOTAL_SIZE</p>
                 <p>当前文件总数：TOTAL_COUNT</p>
@@ -64,12 +84,39 @@
         axios.post('UPLOAD', formData)
             .then(response => {
                 filePrompt.innerHTML = "文件上传成功，链接为：" + response.data;
-                console.log('文件上传成功', response);
+                console.log("文件上传成功", response);
             })
             .catch(error => {
                 filePrompt.innerHTML = "文件上传失败: " + error.message || "未知错误";
-                console.error('文件上传失败', error);
+                console.error("文件上传失败", error);
             });
+    }
+
+    function deleteFile() {
+        const deleteInput = document.getElementById('deleteInput');
+        const deletePrompt = document.getElementById('deletePrompt');
+        filePrompt.innerHTML = "";
+        const filename = deleteInput.value;
+
+        if (!filename) {
+            deletePrompt.innerHTML = "请输入文件名!";
+            return;
+        }
+
+        axios.post('DELETE', {
+            file: filename,
+        }).then(() => {
+            deletePrompt.innerHTML = "文件已被删除";
+            console.log("文件已被删除：" + filename);
+        }).catch(error => {
+            if (error.response.status == 404) {
+                deletePrompt.innerHTML = "服务器找不到你提供的文件";
+                console.log("文件找不到：" + filename);
+            } else {
+                deletePrompt.innerHTML = "文件删除失败: " + error.message || "未知错误";
+                console.error("文件删除失败", error);
+            }
+        })
     }
 </script>
 
