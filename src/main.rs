@@ -1,7 +1,7 @@
 mod config;
 mod util;
 
-use log::{error, info};
+use log::{error, info, warn};
 use std::{
     fs::{self, File},
     io::{Read, Write},
@@ -50,6 +50,11 @@ async fn main() -> std::io::Result<()> {
     let max_file_size = config.max_file_size();
     info!("Max file size: {}", format_file_size(max_file_size));
 
+    let file_storage_path = format!("{}/file", www_root);
+    let total_size = calculate_total_size(&file_storage_path);
+    let total_size_str = format_file_size(total_size as usize);
+    info!("File storage total size: {}", total_size_str);
+
     let app_state = AppState {
         www_root,
         ssl,
@@ -96,9 +101,11 @@ struct AppState {
 async fn index(data: web::Data<AppState>) -> impl Responder {
     let www_root = &data.www_root;
     let host = &data.host;
-    let port = &data.port;
-    let ssl = &data.ssl;
-    let proxy = &data.proxy;
+    let port = data.port;
+    let ssl = data.ssl;
+    let proxy = data.proxy;
+    let max_file_size = data.max_file_size;
+    let max_file_size_str = format_file_size(max_file_size);
 
     let protocol = match ssl {
         true => "https".to_string(),
@@ -110,6 +117,9 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     };
 
     let index_path = format!("{}/index.html", www_root);
+    let file_storage_path = format!("{}/file", www_root);
+    let total_size = calculate_total_size(&file_storage_path);
+    let total_size_str = format_file_size(total_size as usize);
     let mut index_file = File::open(&index_path)
         .map_err(|e| {
             eprintln!("Couldn't open index.html: {}", e);
@@ -121,8 +131,10 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
         .read_to_string(&mut index_content)
         .expect("Couldn't read index.html!");
     let index_content = index_content.replace("UPLOAD", &request_url);
+    let index_content = index_content.replace("TOTAL_SIZE", &total_size_str);
+    let index_content = index_content.replace("MAX_SIZE", &max_file_size_str);
 
-    info!("Request for / OK");
+    info!("Request for index is OK");
 
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -132,7 +144,11 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
 #[get("/{filename}")]
 async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> impl Responder {
     let www_root = &data.www_root;
-    let file_path = format!("{}/file/{}", www_root, filename);
+    let file_path = if filename.as_str() == "favicon.ico" {
+        format!("{}/{}", www_root, filename)
+    } else {
+        format!("{}/file/{}", www_root, filename)
+    };
     let mut file = match File::open(&file_path) {
         Ok(f) => f,
         Err(_) => {
@@ -147,7 +163,7 @@ async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> imp
                 Err(_) => "<h1>404 Not Found</h1>".as_bytes().to_vec(),
             };
 
-            info!("File {} not fount when trying to access it.", &filename);
+            warn!("File {} not fount when trying to access it.", &filename);
 
             return HttpResponse::NotFound()
                 .content_type("text/html; charset=utf-8")
@@ -289,13 +305,13 @@ async fn delete_file(
                 return HttpResponse::Ok().body(format!("{} deleted", filename));
             }
             Err(err) => {
-                info!("Internal error when deleting file {}.", &filename);
+                error!("Internal error when deleting file {}.", &filename);
                 return HttpResponse::InternalServerError()
                     .body(format!("Error deleting file {}: {:?}", filename, err));
             }
         }
     } else {
-        info!("File {} not fount when trying to delete it.", &filename);
+        warn!("File {} not fount when trying to delete it.", &filename);
         return HttpResponse::NotFound().body(format!("{} not found", filename));
     }
 }

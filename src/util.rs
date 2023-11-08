@@ -1,4 +1,8 @@
-use std::time::SystemTime;
+use std::{
+    time::SystemTime,
+    fs,
+    path::Path,
+};
 
 /// # get_time
 /// 
@@ -34,6 +38,9 @@ pub fn shorten(input: &str) -> String {
 /// ## 返回
 /// - 格式化后的文件大小，原始大小的单位将被动态地调整到`B`、`KB`、`MB`、`GB`、`TB`等单位，并保留1位小数。
 pub fn format_file_size(size: usize) -> String {
+    if size == 0 {
+        return "0 B".to_string();
+    }
     let units = ["B", "KB", "MB", "GB", "TB"];
     let mut size = size as f64;
     let mut unit_index = 0;
@@ -44,4 +51,28 @@ pub fn format_file_size(size: usize) -> String {
     }
 
     format!("{:.1} {}", size, units[unit_index])
+}
+
+pub fn calculate_total_size(directory_path: &str) -> u64 {
+    let path = Path::new(directory_path);
+
+    if !path.is_dir() {
+        panic!("Path {} is not a directory!", directory_path);
+    }
+
+    let mut total_size = 0;
+
+    for entry in fs::read_dir(path).unwrap() {
+        let entry = entry.unwrap();
+        let metadata = entry.metadata().unwrap();
+
+        if metadata.is_file() {
+            total_size += metadata.len();
+        } else if metadata.is_dir() {
+            // 如果你想要递归计算子目录的文件大小，可以在这里调用递归函数
+            // 例如：total_size += calculate_total_size(entry.path().to_str().unwrap())?;
+        }
+    }
+
+    total_size
 }
