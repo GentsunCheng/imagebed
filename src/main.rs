@@ -54,6 +54,8 @@ async fn main() -> std::io::Result<()> {
     let total_size = calculate_total_size(&file_storage_path);
     let total_size_str = format_file_size(total_size as usize);
     info!("File storage total size: {}", total_size_str);
+    let total_count = get_file_count(&file_storage_path);
+    info!("File count: {}", total_count);
 
     let app_state = AppState {
         www_root,
@@ -120,6 +122,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     let file_storage_path = format!("{}/file", www_root);
     let total_size = calculate_total_size(&file_storage_path);
     let total_size_str = format_file_size(total_size as usize);
+    let total_count = get_file_count(&file_storage_path);
     let mut index_file = File::open(&index_path)
         .map_err(|e| {
             eprintln!("Couldn't open index.html: {}", e);
@@ -133,6 +136,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     let index_content = index_content.replace("UPLOAD", &request_url);
     let index_content = index_content.replace("TOTAL_SIZE", &total_size_str);
     let index_content = index_content.replace("MAX_SIZE", &max_file_size_str);
+    let index_content = index_content.replace("TOTAL_COUNT", &total_count.to_string());
 
     info!("Request for index is OK");
 
@@ -141,10 +145,16 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
         .body(index_content)
 }
 
+// 存在于白名单中的文件将被认为存放在www_root下，而不是www_root/file下
+const FILE_WHITELIST: [&'static str; 2] = [
+    "favicon.ico",
+    "style.css",
+];
+
 #[get("/{filename}")]
 async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> impl Responder {
     let www_root = &data.www_root;
-    let file_path = if filename.as_str() == "favicon.ico" {
+    let file_path = if FILE_WHITELIST.contains(&filename.as_str()) {
         format!("{}/{}", www_root, filename)
     } else {
         format!("{}/file/{}", www_root, filename)

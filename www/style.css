@@ -1,0 +1,7 @@
+.container {
+    max-height: 100vh;
+    width: 80vw;
+    overflow-y: auto;
+    margin: 0 auto;
+    text-align: center;
+}

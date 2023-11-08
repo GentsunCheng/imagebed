@@ -76,3 +76,14 @@ pub fn calculate_total_size(directory_path: &str) -> u64 {
 
     total_size
 }
+
+pub fn get_file_count(directory_path: &str) -> usize {
+    let path = Path::new(directory_path);
+
+    if !path.is_dir() {
+        panic!("Path {} is not a directory!", directory_path);
+    }
+
+    let count = fs::read_dir(path).unwrap().count();
+    count
+}

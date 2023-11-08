@@ -57,6 +57,9 @@ I will add English RAEDME after I complete this project.
 
 - 计划通过sqlite之类的服务来支持对文件信息的存储，然后就可以用一些算法来淘汰长时间没用过的文件。
 - HTML仍然需要改进。
+- 增加在前端网页上传图片的功能
+- 支持交互式操作，支持重载配置文件。
+- 用模板引擎重写index部分
 
 ## 警告 | Warning
 
