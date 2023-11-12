@@ -5,3 +5,5 @@ host = "localhost"
 port = 7879
 local = true
 max_file_size = 5
+use_token = true
+token = "testtoken"

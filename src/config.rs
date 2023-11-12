@@ -4,6 +4,8 @@ use std::io::prelude::*;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 
+use crate::util::get_str_sha256;
+
 /// # Config
 /// 
 /// 存储服务配置信息
@@ -22,6 +24,8 @@ pub struct Config {
     port: u16,
     local: bool,
     max_file_size: usize,
+    use_token: bool,
+    token: String,
 }
 
 impl Config {
@@ -35,6 +39,8 @@ impl Config {
             port: 7879,
             local: true,
             max_file_size: 5 * 1024 * 1024,
+            use_token: false,
+            token: "testtoken".to_string(),
         }
     }
 
@@ -104,5 +110,13 @@ impl Config {
 
     pub fn max_file_size(&self) -> usize {
         self.max_file_size
+    }
+
+    pub fn use_token(&self) -> bool {
+        self.use_token
+    }
+
+    pub fn hashed_token(&self) -> String {
+        get_str_sha256(&self.token)
     }
 }

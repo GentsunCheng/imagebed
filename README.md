@@ -42,7 +42,8 @@ I will add English RAEDME after I complete this project.
 ### 使用服务
 
 - 你可以访问这个服务的 `root`（以默认配置为例，是`http://localhost:7879`）来查看一个简单的导航页。该页面包含了文件上传和删除的功能。我希望尽量保持这个页面的简单性，因此不会添加太多额外的样式。
-- 上传文件：向 `/upload` 发送一个 POST 请求，携带要上传的文件，最好一个请求只传一个文件，如果传了多个，则服务器只会接受第一个。然后服务在这个请求的响应中会给出文件的直链。于是你就可以保存并使用这个直链了。
+- 上传文件：向 `/upload` 发送一个 POST 请求，`Content-Type` 为 `multipart/form-data`，携带要上传的文件，一个请求只能传一个文件，如果传了多个，则服务器只会接受第一个。然后服务在这个请求的响应中会给出文件的直链。于是你就可以保存并使用这个直链了。
+  - 如果你在配置文件中启用了 token 功能，那么在文件之前还要带上一个额外的 `token` 字段。注意 `token` 是明文传输的，这个功能只是为了限制第三方上传有害的文件，因此不要把 token 视为密码。token 只是一个简单的口令。
   - 文件名是通过将文件内容和处理请求的时间进行 SHA256 哈希，得到的结果从中间截断，作为两个 128 位数字相加，舍去进位，作为 16 进制输出得到的。因此只要一秒内没有传两个相同的文件，就不会出现文件重复的情况（不考虑哈希碰撞）。
 - 删除文件：向 `/delete` 发送一个 POST 请求，请求体是一个满足如下格式的 JSON：
 
@@ -54,12 +55,62 @@ I will add English RAEDME after I complete this project.
 
     一次只能删除一个文件。这种设计意味着文件名就是你对该文件所有权的唯一证明，只要获知文件名，就可以删除它。
 
+    无论上传时是否要求提供 token，删除时都无需 token。
+
+## 配置文件详解
+
+配置文件的位置是 `config/config.toml` 。
+
+|配置项|类型|描述|
+|:-:|:-:|---|
+|`www_root`|`&str`|用来存放 `file` 目录的目录。在之前的版本，`index.html` 等服务自带的页面也存放在这里，但现在它们固定存放在 `./www` 下了。之后预计会修改这块的逻辑。|
+|`proxy`|`bool`|是否使用反向代理。决定了动态生成请求 URL 时是否会带上端口号。如果为 `true`，则不会带上端口号；如果为 `false`，则会带上端口号。|
+|`ssl`|`bool`|是否使用 SSL 连接。决定了动态生成请求 URL 时的协议是 `http` 还是 `https`。|
+|`host`|`&str`|主机名。当工作在本地时，可以填写为 `localhost`；工作在公网时，可以填公网 IP 或者域名。|
+|`port`|`u16`|监听端口号，默认值为7879|
+|`local`|`bool`|是否工作在本地。如果为 `true`，则监听 IP 为 `0.0.0.0` ；如果为 `false`，则监听 IP 为 `127.0.0.1`；推荐的操作是开启反向代理，并在此处设为 `false`。|
+|`max_file_size`|`usize`|允许上传的最大文件大小，单位为 MB。|
+|`use_token`|`bool`|上传时是否要求提供口令。|
+|`token`|`String`|上传时的口令，仅当 `use_token` 为 `true` 时才生效。|
+
+## 代码示例 | Example
+
+使用 [Axios](https://www.axios-http.cn/) 的示例（TypeScript）：
+```typescript
+import axios from 'axios';
+
+// 是否使用 token 验证功能
+const use_token: boolean = false;
+
+// 假设你已经通过<input>之类的标签获得了一个文件，名为 file
+const formdata = new FormData();
+if (use_token) {
+    formData.append("token", token);
+}
+formData.append('file', file);  // 总是添加 file
+
+// 使用 Axios 发送 POST 请求
+axios.post('UPLOAD', formData, {    // 把 UPLOAD 替换为请求 URL
+    headers: {
+        'Content-Type': 'multipart/form-data',
+    }
+}).then(response => {
+    console.log("文件上传成功，链接为：", response.data);
+}).catch(error => {
+    if (use_token && error.response.data == "Incorrect token!") {
+        console.log("token 不正确，文件上传失败");
+    } else {
+        console.error("文件上传失败：", error.message);
+    }
+});
+```
+
 ## 开发计划 | Plans
 
-- 计划通过sqlite之类的服务来支持对文件信息的存储，然后就可以用一些算法来淘汰长时间没用过的文件。
-- HTML仍然需要改进。
+- 计划通过 sqlite 之类的服务来支持对文件信息的存储，然后就可以用一些算法来淘汰长时间没用过的文件。
+- HTML 样式改进。
 - 后端支持交互式操作，支持重载配置文件。
-- 用模板引擎重写index部分
+- 用模板引擎重写 index 部分
 
 ## 警告 | Warning
 

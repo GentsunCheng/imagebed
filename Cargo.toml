@@ -2,6 +2,14 @@
 name = "imagebed"
 version = "0.1.0"
 edition = "2021"
+authors = ["Eslzzyl <eslzzyl@163.com>"]
+description = "A simple image hosting service based on Actix-web"
+repository = "https://github.com/Eslzzyl/imagebed"
+readme = "README.md"
+license = "MIT"
+keywords = ["image-hosting", "actix-web"]
+categories = ["web-programming::http-server"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

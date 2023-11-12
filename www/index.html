@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
-<body>
+<body onload="init()">
     <div class="container">
         <h1>简易图床</h1>
         <a href="https://github.com/Eslzzyl/imagebed">
@@ -16,19 +16,22 @@
         </a>
         <div style="text-align: left;">
             <div>
+                <h2>状态</h2>
+                <p>当前文件仓库总体积：TOTAL_SIZE</p>
+                <p>当前文件总数：TOTAL_COUNT</p>
+            </div>
+            <div>
                 <h2>在线上传</h2>
                 <form id="uploadForm" enctype="multipart/form-data">
-                    <input type="file" id="fileInput" name="fileInput">
+                    <input type="file" id="fileInput">
+                    <br>
+                    <span>输入token：</span>
+                    <input id="tokenInput">
                     <br>
                     <button type="button" onclick="uploadFile()">上传</button>
                     <br>
-                    <span id="filePrompt"></span>
+                    <span id="uploadPrompt"></span>
                 </form>
-            </div>
-            <div>
-                <h2>通过脚本上传</h2>
-                <p>向 UPLOAD 发 POST 请求，请求体携带你想上传的文件。你会在响应体中得到该文件的链接。</p>
-                <p>文件不得大于 MAX_SIZE 。</p>
             </div>
             <div>
                 <h2>删除文件</h2>
@@ -41,6 +44,49 @@
                 </form>
             </div>
             <div>
+                <h2>通过脚本上传</h2>
+                <h3>当不启用 token 功能时</h3>
+                <p>向 UPLOAD 发 POST 请求，请求体携带你想上传的文件。你会在响应体中得到该文件的链接。</p>
+                <p>使用 <a href="https://www.axios-http.cn/">Axios</a> 的示例：</p>
+<pre><code>const formData = new FormData();
+formData.append('file', file);
+
+axios.post('UPLOAD', formData, {
+    headers: {
+        'Content-Type': 'multipart/form-data',
+    }
+}).then(response => {
+    console.log("文件上传成功，链接为：", response.data);
+}).catch(error => {
+    console.error("文件上传失败", error.message);
+});
+</code></pre>
+                <h3>当启用 token 功能时</h3>
+                <p>向 UPLOAD 发 POST 请求，请求体先携带 token，再携带你想上传的文件。</p>
+                <p>如果 token 不正确，服务端将返回 400 响应，响应体为“Incorrect token!”</p>
+                <p>使用 <a href="https://www.axios-http.cn/">Axios</a> 的示例：</p>
+<pre><code>const formData = new FormData();
+formData.append("token", token);
+formData.append('file', file);
+
+axios.post('UPLOAD', formData, {
+    headers: {
+        'Content-Type': 'multipart/form-data',
+    }
+}).then(response => {
+    console.log("文件上传成功，链接为：", response.data);
+}).catch(error => {
+    if (error.response.data == "Incorrect token!") {
+        console.log("token 不正确，文件上传失败");
+    } else {
+        console.error("文件上传失败", error.message);
+    }
+});
+</code></pre>
+                <br>
+                <p>每个请求只能携带一个文件，更多的文件将被忽略。文件不得大于 MAX_SIZE 。</p>
+            </div>
+            <div>
                 <h2>通过脚本删除文件</h2>
                 <p>向 DELETE 发 POST 请求，请求体携带你想删除的文件名，按照如下格式：</p>
                 <code>
@@ -50,52 +96,75 @@
                 </code>
                 <p>服务器回复 200 OK，表示文件已经成功删除；回复 404，表示你提供的文件找不到。</p>
             </div>
-            <div>
-                <h2>状态</h2>
-                <p>当前文件仓库总体积：TOTAL_SIZE</p>
-                <p>当前文件总数：TOTAL_COUNT</p>
-            </div>
         </div>
     </div>
 </body>
 
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <script>
+    function init() {
+        const use_token = USE_TOKEN;
+        const tokenInput = document.getElementById('tokenInput');
+        if (!use_token) {
+            tokenInput.value = "当前服务无需token";
+            tokenInput.setAttribute("disabled", "disabled");
+        }
+    }
+
     function uploadFile() {
-        // 获取文件输入框
+        const use_token = USE_TOKEN;
         const fileInput = document.getElementById('fileInput');
-        // 获取提示标签
-        const filePrompt = document.getElementById('filePrompt');
-        filePrompt.innerHTML = "";
+        const tokenInput = document.getElementById('tokenInput');
+        
+        const uploadPrompt = document.getElementById('uploadPrompt');
+        uploadPrompt.innerHTML = "";
+
+        const token = tokenInput.value;
+
         // 获取文件
         const file = fileInput.files[0];
 
         // 检查是否选择了文件
         if (!file) {
-            filePrompt.innerHTML = "请选择文件!";
+            uploadPrompt.innerHTML = "请选择文件！";
+            return;
+        }
+        console.log(token)
+        if (use_token && !token) {
+            uploadPrompt.innerHTML = "请输入token！";
             return;
         }
 
         // 创建 FormData 对象，用于将文件数据添加到 HTTP 请求中
         const formData = new FormData();
+        if (use_token) {
+            formData.append("token", token);
+        }
         formData.append('file', file);
 
         // 使用 Axios 发送 POST 请求
-        axios.post('UPLOAD', formData)
-            .then(response => {
-                filePrompt.innerHTML = "文件上传成功，链接为：" + response.data;
-                console.log("文件上传成功", response);
-            })
-            .catch(error => {
-                filePrompt.innerHTML = "文件上传失败: " + error.message || "未知错误";
+        axios.post('UPLOAD', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            }
+        }).then(response => {
+            uploadPrompt.innerHTML = "文件上传成功，链接为：" + response.data;
+            console.log("文件上传成功", response);
+        }).catch(error => {
+            if (use_token && error.response.data == "Incorrect token!") {
+                uploadPrompt.innerHTML = "token 不正确！";
+                console.log("token 不正确，文件上传失败");
+            } else {
+                uploadPrompt.innerHTML = "文件上传失败: " + error.message || "未知错误";
                 console.error("文件上传失败", error);
-            });
+            }
+        });
     }
 
     function deleteFile() {
         const deleteInput = document.getElementById('deleteInput');
         const deletePrompt = document.getElementById('deletePrompt');
-        filePrompt.innerHTML = "";
+        uploadPrompt.innerHTML = "";
         const filename = deleteInput.value;
 
         if (!filename) {

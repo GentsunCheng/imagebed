@@ -4,6 +4,8 @@ use std::{
     path::Path,
 };
 
+use sha2::{Digest, Sha256};
+
 /// # get_time
 /// 
 /// 用于获取系统时间。
@@ -86,4 +88,11 @@ pub fn get_file_count(directory_path: &str) -> usize {
 
     let count = fs::read_dir(path).unwrap().count();
     count
+}
+
+pub fn get_str_sha256(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input);
+    let result = hasher.finalize();
+    format!("{:x}", result)
 }

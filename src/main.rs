@@ -49,6 +49,12 @@ async fn main() -> std::io::Result<()> {
     info!("Listen IP: {}", &listen_ip);
     let max_file_size = config.max_file_size();
     info!("Max file size: {}", format_file_size(max_file_size));
+    let use_token = config.use_token();
+    info!("Use token: {}", use_token);
+    let hashed_token = config.hashed_token();
+    if use_token {
+        info!("Hashed token: {}", hashed_token);
+    }
 
     let file_storage_path = format!("{}/file", www_root);
     let total_size = calculate_total_size(&file_storage_path);
@@ -64,6 +70,8 @@ async fn main() -> std::io::Result<()> {
         port,
         proxy,
         max_file_size,
+        use_token,
+        hashed_token,
     };
 
     let server = match HttpServer::new(move || {
@@ -97,6 +105,8 @@ struct AppState {
     port: u16,
     proxy: bool,
     max_file_size: usize,
+    use_token: bool,
+    hashed_token: String,
 }
 
 #[get("/")]
@@ -108,6 +118,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     let proxy = data.proxy;
     let max_file_size = data.max_file_size;
     let max_file_size_str = format_file_size(max_file_size);
+    let use_token = data.use_token;
 
     let protocol = match ssl {
         true => "https".to_string(),
@@ -116,11 +127,11 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     let (request_url, delete_url) = match proxy {
         true => (
             format!("{}://{}/upload", protocol, host),
-            format!("{}://{}/delete", protocol, host)
+            format!("{}://{}/delete", protocol, host),
         ),
         false => (
             format!("{}://{}:{}/upload", protocol, host, port),
-            format!("{}://{}:{}/delete", protocol, host, port)
+            format!("{}://{}:{}/delete", protocol, host, port),
         ),
     };
 
@@ -139,11 +150,18 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     index_file
         .read_to_string(&mut index_content)
         .expect("Couldn't read index.html!");
-    let index_content = index_content.replace("UPLOAD", &request_url);
-    let index_content = index_content.replace("TOTAL_SIZE", &total_size_str);
-    let index_content = index_content.replace("MAX_SIZE", &max_file_size_str);
-    let index_content = index_content.replace("TOTAL_COUNT", &total_count.to_string());
-    let index_content = index_content.replace("DELETE", &delete_url);
+    let replacements = [
+        ("UPLOAD", &request_url),
+        ("TOTAL_SIZE", &total_size_str),
+        ("MAX_SIZE", &max_file_size_str),
+        ("TOTAL_COUNT", &total_count.to_string()),
+        ("DELETE", &delete_url),
+        ("USE_TOKEN", &(use_token.to_string())),
+    ];
+
+    for (pattern, replacement) in replacements.iter() {
+        index_content = index_content.replace(pattern, replacement);
+    }
 
     info!("Request for index is OK");
 
@@ -153,10 +171,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
 }
 
 // 存在于白名单中的文件将被认为存放在www_root下，而不是www_root/file下
-const FILE_WHITELIST: [&'static str; 2] = [
-    "favicon.ico",
-    "style.css",
-];
+const FILE_WHITELIST: [&'static str; 2] = ["favicon.ico", "style.css"];
 
 #[get("/{filename}")]
 async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> impl Responder {
@@ -221,39 +236,59 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
     let proxy = data.proxy;
     let max_file_size = data.max_file_size;
     let max_file_size_str = format_file_size(max_file_size);
+    let use_token = data.use_token;
+    let hashed_token = &data.hashed_token;
 
     // 生成一个唯一的文件名（基于文件内容的哈希值）
     let mut hasher = Sha256::new();
     let mut file_content = Vec::new();
-    let mut file_extension = String::new();
-    while let Some(item) = payload.next().await {
-        match item {
-            Ok(mut field) => {
-                let cd = field.content_disposition();
-                let file_name = cd.get_filename().unwrap_or("unknown");
 
-                file_extension = Path::new(file_name)
-                    .extension()
-                    .and_then(std::ffi::OsStr::to_str)
-                    .unwrap_or("unknown")
-                    .to_string();
+    // 先接收token
+    if use_token {
+        match payload.next().await.unwrap() {
+            Ok(mut field) => {
+                let mut token_chunk = Vec::new();
                 while let Some(chunk) = field.next().await {
-                    file_content.extend_from_slice(&chunk.unwrap());
-                    hasher.update(&file_content);
+                    token_chunk.extend_from_slice(&chunk.unwrap());
                 }
-                let file_size = file_content.len();
-                let file_size_str = format_file_size(file_size);
-                info!("The file size is {}", &file_size_str);
-                if file_size > max_file_size {
-                    error!("The file size is too large, refused.");
-                    return HttpResponse::BadRequest().body(format!(
-                        "The file size is too large (got {}, expected less than {}).",
-                        &file_size_str, &max_file_size_str
-                    ));
+                let token = String::from_utf8(token_chunk).unwrap();
+                if get_str_sha256(&token) != *hashed_token {
+                    return HttpResponse::BadRequest().body("Incorrect token!");
                 }
             }
             Err(_) => return HttpResponse::InternalServerError().finish(),
         }
+    }
+
+    let file_extension;
+
+    // 然后接收文件
+    match payload.next().await.unwrap() {
+        Ok(mut field) => {
+            let cd = field.content_disposition();
+            let file_name = cd.get_filename().unwrap_or("unknown");
+
+            file_extension = Path::new(file_name)
+                .extension()
+                .and_then(std::ffi::OsStr::to_str)
+                .unwrap_or("unknown")
+                .to_string();
+            while let Some(chunk) = field.next().await {
+                file_content.extend_from_slice(&chunk.unwrap());
+                hasher.update(&file_content);
+            }
+            let file_size = file_content.len();
+            let file_size_str = format_file_size(file_size);
+            info!("The file size is {}", &file_size_str);
+            if file_size > max_file_size {
+                error!("The file size is too large, refused.");
+                return HttpResponse::BadRequest().body(format!(
+                    "The file size is too large (got {}, expected less than {}).",
+                    &file_size_str, &max_file_size_str
+                ));
+            }
+        }
+        Err(_) => return HttpResponse::InternalServerError().finish(),
     }
 
     hasher.update(get_time().to_string().as_bytes());
@@ -314,8 +349,7 @@ async fn delete_file(
     let filename = &req_body.file;
 
     if filename.is_empty() {
-        return HttpResponse::BadRequest()
-            .body("Please do not send blank file name");
+        return HttpResponse::BadRequest().body("Please do not send blank file name");
     }
 
     let path = format!("{}/file/{}", www_root, filename);
