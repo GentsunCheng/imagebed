@@ -17,6 +17,7 @@ categories = ["web-programming::http-server"]
 actix-cors = "0.6.4"
 actix-multipart = "0.6.1"
 actix-web = "4.4.0"
+clap = { version = "4.4.8", features = ["derive"] }
 futures-util = "0.3.29"
 log = "0.4.20"
 log4rs = "1.2.0"

@@ -1,5 +1,7 @@
 mod config;
 mod util;
+mod args;
+mod commands;
 
 use log::{error, info, warn};
 use std::{
@@ -22,12 +24,25 @@ use log4rs;
 use new_mime_guess;
 use serde_derive::Deserialize;
 use sha2::{Digest, Sha256};
+use clap::Parser;
 
 use crate::config::Config;
 use crate::util::*;
+use crate::args::*;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let cli = Cli::parse();
+
+    // 处理命令行参数
+    match &cli.command {
+        Some(Commands::Clear) => {
+            commands::clear_storage();
+            return Ok(());
+        },
+        None => {}
+    };
+
     // 初始化日志系统
     log4rs::init_file("config/log4rs.yaml", Default::default()).unwrap();
 
