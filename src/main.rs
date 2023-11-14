@@ -9,6 +9,7 @@ use std::{
 };
 
 use actix_multipart::Multipart;
+use actix_cors::Cors;
 use actix_web::{
     get,
     http::header::ContentType,
@@ -75,7 +76,9 @@ async fn main() -> std::io::Result<()> {
     };
 
     let server = match HttpServer::new(move || {
+        let cors = Cors::default().allow_any_origin();
         App::new()
+            .wrap(cors)
             .app_data(web::Data::new(app_state.clone()))
             .service(index)
             .service(get_file)
@@ -195,7 +198,7 @@ async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> imp
                 Err(_) => "<h1>404 Not Found</h1>".as_bytes().to_vec(),
             };
 
-            warn!("File {} not fount when trying to access it.", &filename);
+            warn!("File {} not found when trying to access it.", &filename);
 
             return HttpResponse::NotFound()
                 .content_type("text/html; charset=utf-8")
