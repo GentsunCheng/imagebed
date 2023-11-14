@@ -25,6 +25,8 @@ I will add English RAEDME after I complete this project.
     - 如果使用反向代理，在你的 Web 服务器中配置，将你希望的域名和访问路径反代到内网的 `localhost:[port]`，然后编辑 `config.toml`文件，根据实际需要配置 `www_root`；`proxy` 写 `true`；`ssl` 根据实际情况写（根据你的反向代理服务器是否配置SSL来确定，`ssl` 配置项目前仅仅决定返回的URL是 `http` 开头还是 `https` 开头）；`host` 写 `localhost`，`port` 写你在反向代理中配置的端口，`local` 写 `true`。
     - 如果不使用反向代理，编辑 `config.toml`文件，根据实际需要配置 `www_root`；`proxy` 写 `false`，`ssl` 写 `false`（本程序目前不支持 SSL）；`host` 写你部署的服务器的 IP 或者域名，`port` 写你决定的端口，`local` 写 `false`。
       - 如果你不使用反向代理，那么这个程序可能很不安全，请你权衡风险。
+    - 如果你需要上传者在上传时提供口令，那么将 `use_token` 设为 `true`，并将 `token` 设为你想要的内容；如果你不需要口令，则将 `use_token` 设为 `false`，并将 `token` 设置为任意内容。
+        - 即使 `use-token` 为 `false`，`token` 字段也不能省略。
 
 3. 运行
 
