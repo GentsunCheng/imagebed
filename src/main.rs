@@ -26,7 +26,10 @@ use serde_derive::Deserialize;
 use sha2::{Digest, Sha256};
 use clap::Parser;
 
-use crate::config::Config;
+use crate::config::{
+    Config,
+    UploadMode
+};
 use crate::util::*;
 use crate::args::*;
 
@@ -71,8 +74,18 @@ async fn main() -> std::io::Result<()> {
     if use_token {
         info!("Hashed token: {}", hashed_token);
     }
+    let upload_mode = config.upload_mode();
+    info!("Upload mode: {:?}", upload_mode);
+    let upload_whitelist = config.upload_whitelist();
+    info!("Upload whitelist: {:?}", upload_whitelist);
+    let upload_blacklist = config.upload_blacklist();
+    info!("Upload blacklist: {:?}", upload_blacklist);
 
     let file_storage_path = format!("{}/file", www_root);
+    if !Path::new(&file_storage_path).exists() {
+        warn!("File storage path {} not exists, making it.", &file_storage_path);
+        fs::create_dir(&file_storage_path).unwrap();
+    }
     let total_size = calculate_total_size(&file_storage_path);
     let total_size_str = format_file_size(total_size as usize);
     info!("File storage total size: {}", total_size_str);
@@ -88,6 +101,9 @@ async fn main() -> std::io::Result<()> {
         max_file_size,
         use_token,
         hashed_token,
+        upload_mode,
+        upload_whitelist,
+        upload_blacklist,
     };
 
     let server = match HttpServer::new(move || {
@@ -125,6 +141,9 @@ struct AppState {
     max_file_size: usize,
     use_token: bool,
     hashed_token: String,
+    upload_mode: UploadMode,
+    upload_whitelist: Vec<String>,
+    upload_blacklist: Vec<String>,
 }
 
 #[get("/")]
@@ -256,6 +275,9 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
     let max_file_size_str = format_file_size(max_file_size);
     let use_token = data.use_token;
     let hashed_token = &data.hashed_token;
+    let upload_mode = &data.upload_mode;
+    let upload_whitelist = &data.upload_whitelist;
+    let upload_blacklist = &data.upload_blacklist;
 
     // 生成一个唯一的文件名（基于文件内容的哈希值）
     let mut hasher = Sha256::new();
@@ -286,25 +308,47 @@ async fn upload_file(data: web::Data<AppState>, mut payload: Multipart) -> impl 
             let cd = field.content_disposition();
             let file_name = cd.get_filename().unwrap_or("unknown");
 
+            // 获取文件扩展名
             file_extension = Path::new(file_name)
                 .extension()
                 .and_then(std::ffi::OsStr::to_str)
                 .unwrap_or("unknown")
                 .to_string();
+            // 检查上传模式
+            if *upload_mode == UploadMode::Whitelist {
+                if !upload_whitelist.contains(&file_extension) {
+                    error!("File extension {} not in whitelist.", &file_extension);
+                    return HttpResponse::BadRequest().body(format!(
+                        "You can't upload a file with extension {}, because the extension is not in whitelist.",
+                        &file_extension
+                    ));
+                }
+            } else if *upload_mode == UploadMode::Blacklist {
+                if upload_blacklist.contains(&file_extension) {
+                    error!("File extension {} in blacklist.", &file_extension);
+                    return HttpResponse::BadRequest().body(format!(
+                        "You can't upload a file with extension {}, because the extension is in blacklist.",
+                        &file_extension
+                    ));
+                }
+            }
+
             while let Some(chunk) = field.next().await {
                 file_content.extend_from_slice(&chunk.unwrap());
+                let file_size = file_content.len();
+                if file_size > max_file_size {
+                    error!("The file size is too large, refused.");
+                    let file_size_str = format_file_size(file_size);
+                    return HttpResponse::BadRequest().body(format!(
+                        "The file is too large (already got {}, expected less than {}).",
+                        &file_size_str, &max_file_size_str
+                    ));
+                }
                 hasher.update(&file_content);
             }
             let file_size = file_content.len();
             let file_size_str = format_file_size(file_size);
             info!("The file size is {}", &file_size_str);
-            if file_size > max_file_size {
-                error!("The file size is too large, refused.");
-                return HttpResponse::BadRequest().body(format!(
-                    "The file size is too large (got {}, expected less than {}).",
-                    &file_size_str, &max_file_size_str
-                ));
-            }
         }
         Err(_) => return HttpResponse::InternalServerError().finish(),
     }

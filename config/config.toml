@@ -7,3 +7,6 @@ local = true
 max_file_size = 5
 use_token = true
 token = "testtoken"
+upload_mode = "None"
+upload_whitelist = []
+upload_blacklist = []

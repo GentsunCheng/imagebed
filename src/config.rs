@@ -6,6 +6,13 @@ use serde_derive::Serialize;
 
 use crate::util::get_str_sha256;
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum UploadMode {
+    None,
+    Whitelist,
+    Blacklist,
+}
+
 /// # Config
 /// 
 /// 存储服务配置信息
@@ -26,6 +33,9 @@ pub struct Config {
     max_file_size: usize,
     use_token: bool,
     token: String,
+    upload_mode: UploadMode,
+    upload_whitelist: Vec<String>,
+    upload_blacklist: Vec<String>,
 }
 
 impl Config {
@@ -41,6 +51,9 @@ impl Config {
             max_file_size: 5 * 1024 * 1024,
             use_token: false,
             token: "testtoken".to_string(),
+            upload_mode: UploadMode::None,
+            upload_whitelist: Vec::new(),
+            upload_blacklist: Vec::new(),
         }
     }
 
@@ -118,5 +131,17 @@ impl Config {
 
     pub fn hashed_token(&self) -> String {
         get_str_sha256(&self.token)
+    }
+
+    pub fn upload_mode(&self) -> UploadMode {
+        self.upload_mode.clone()
+    }
+
+    pub fn upload_whitelist(&self) -> Vec<String> {
+        self.upload_whitelist.clone()
+    }
+
+    pub fn upload_blacklist(&self) -> Vec<String> {
+        self.upload_blacklist.clone()
     }
 }

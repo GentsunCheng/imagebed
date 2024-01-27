@@ -1,6 +1,6 @@
 [package]
 name = "imagebed"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Eslzzyl <eslzzyl@163.com>"]
 description = "A simple image hosting service based on Actix-web"
@@ -14,16 +14,16 @@ categories = ["web-programming::http-server"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-cors = "0.6.4"
-actix-multipart = "0.6.1"
-actix-web = "4.4.0"
-clap = { version = "4.4.8", features = ["derive"] }
-futures-util = "0.3.29"
-log = "0.4.20"
-log4rs = "1.2.0"
-mime = "0.3.17"
-new_mime_guess = "4.0.1"
-serde = "1.0.190"
-serde_derive = "1.0.190"
-sha2 = "0.10.8"
-toml = "0.8.6"
+actix-cors = "0.6"
+actix-multipart = "0.6"
+actix-web = "4"
+clap = { version = "4", features = ["derive"] }
+futures-util = "0.3"
+log = "0.4"
+log4rs = "1"
+mime = "0.3"
+new_mime_guess = "4"
+serde = "1.0"
+serde_derive = "1.0"
+sha2 = "0.10"
+toml = "0.8"
