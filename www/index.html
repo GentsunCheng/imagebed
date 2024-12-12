@@ -1,7 +1,6 @@
 <html>
-
 <head>
-    <title>Eslzzyl's Image bed</title>
+    <title>Eslzzyl's Image Bed</title>
     <link rel="stylesheet" type="text/css" href="style.css" />
     <link rel="shortcut icon" href="favicon.ico" />
     <meta charset="UTF-8">
@@ -11,44 +10,46 @@
 <body onload="init()">
     <div class="container">
         <h1>简易图床</h1>
-        <a href="https://github.com/Eslzzyl/imagebed">
+        <a href="https://github.com/Eslzzyl/imagebed" class="repo-link">
             https://github.com/Eslzzyl/imagebed
         </a>
-        <div style="text-align: left;">
-            <div>
-                <h2>状态</h2>
-                <p>当前文件仓库总体积：TOTAL_SIZE</p>
-                <p>当前文件总数：TOTAL_COUNT</p>
-            </div>
-            <div>
-                <h2>在线上传</h2>
-                <form id="uploadForm" enctype="multipart/form-data">
-                    <input type="file" id="fileInput">
-                    <br>
-                    <span>输入token：</span>
-                    <input id="tokenInput">
-                    <br>
-                    <button type="button" onclick="uploadFile()">上传</button>
-                    <br>
-                    <span id="uploadPrompt"></span>
-                </form>
-            </div>
-            <div>
-                <h2>删除文件</h2>
-                <p>你获得的文件哈希是你对该文件所有权的唯一证明。你可以通过提供文件名来要求服务器删除它。</p>
-                <form id="deleteForm">
-                    <input id="deleteInput">
-                    <button type="button" onclick="deleteFile()">删除</button>
-                    <br>
-                    <span id="deletePrompt"></span>
-                </form>
-            </div>
-            <div>
-                <h2>通过脚本上传</h2>
-                <h3>当不启用 token 功能时</h3>
-                <p>向 UPLOAD 发 POST 请求，请求体携带你想上传的文件。你会在响应体中得到该文件的链接。</p>
-                <p>使用 <a href="https://www.axios-http.cn/">Axios</a> 的示例：</p>
-<pre><code>const formData = new FormData();
+        <div class="section">
+            <h2>状态</h2>
+            <p>当前文件仓库总体积：<span id="totalSize">TOTAL_SIZE</span></p>
+            <p>当前文件总数：<span id="totalCount">TOTAL_COUNT</span></p>
+        </div>
+
+        <div class="section">
+            <h2>在线上传</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" id="fileInput" class="file-input">
+                <br>
+                <input id="tokenInput" class="input-field" placeholder="输入token">
+                <br>
+                <button type="button" class="button" onclick="uploadFile()">上传</button>
+                <br>
+                <span id="uploadPrompt" class="prompt"></span>
+                <br>
+                <span id="uploadedLink"></span> <!-- 用于显示文件链接 -->
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>删除文件</h2>
+            <p>你获得的文件哈希是你对该文件所有权的唯一证明。你可以通过提供文件名来要求服务器删除它。</p>
+            <form id="deleteForm">
+                <input id="deleteInput" class="input-field">
+                <br>
+                <button type="button" class="button" onclick="deleteFile()">删除</button>
+                <br>
+                <span id="deletePrompt" class="prompt"></span>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>通过脚本上传</h2>
+            <p>使用 Axios 提交请求上传文件：</p>
+            <pre><code>const formData = new FormData();
 formData.append('file', file);
 
 axios.post('UPLOAD', formData, {
@@ -61,41 +62,17 @@ axios.post('UPLOAD', formData, {
     console.error("文件上传失败", error.message);
 });
 </code></pre>
-                <h3>当启用 token 功能时</h3>
-                <p>向 UPLOAD 发 POST 请求，请求体先携带 token，再携带你想上传的文件。</p>
-                <p>如果 token 不正确，服务端将返回 400 响应，响应体为“Incorrect token!”</p>
-                <p>使用 <a href="https://www.axios-http.cn/">Axios</a> 的示例：</p>
-<pre><code>const formData = new FormData();
-formData.append("token", token);
-formData.append('file', file);
+        </div>
 
-axios.post('UPLOAD', formData, {
-    headers: {
-        'Content-Type': 'multipart/form-data',
-    }
-}).then(response => {
-    console.log("文件上传成功，链接为：", response.data);
-}).catch(error => {
-    if (error.response.data == "Incorrect token!") {
-        console.log("token 不正确，文件上传失败");
-    } else {
-        console.error("文件上传失败", error.message);
-    }
-});
-</code></pre>
-                <br>
-                <p>每个请求只能携带一个文件，更多的文件将被忽略。文件不得大于 MAX_SIZE 。</p>
-            </div>
-            <div>
-                <h2>通过脚本删除文件</h2>
-                <p>向 DELETE 发 POST 请求，请求体携带你想删除的文件名，按照如下格式：</p>
-                <code>
-                    {
-                        "file": "example.jpg"
-                    }
-                </code>
-                <p>服务器回复 200 OK，表示文件已经成功删除；回复 404，表示你提供的文件找不到。</p>
-            </div>
+        <div class="section">
+            <h2>通过脚本删除文件</h2>
+            <p>向 DELETE 发 POST 请求，请求体携带你想删除的文件名，格式如下：</p>
+            <code>
+                {
+                    "file": "example.jpg"
+                }
+            </code>
+            <p>服务器回复 200 OK，表示文件已经成功删除；回复 404，表示你提供的文件找不到。</p>
         </div>
     </div>
 </body>
@@ -105,6 +82,8 @@ axios.post('UPLOAD', formData, {
     function init() {
         const use_token = USE_TOKEN;
         const tokenInput = document.getElementById('tokenInput');
+        
+        // 如果不启用token功能，禁用token输入框并显示提示
         if (!use_token) {
             tokenInput.value = "当前服务无需token";
             tokenInput.setAttribute("disabled", "disabled");
@@ -115,48 +94,43 @@ axios.post('UPLOAD', formData, {
         const use_token = USE_TOKEN;
         const fileInput = document.getElementById('fileInput');
         const tokenInput = document.getElementById('tokenInput');
-        
         const uploadPrompt = document.getElementById('uploadPrompt');
+        const uploadedLink = document.getElementById('uploadedLink');
         uploadPrompt.innerHTML = "";
+        uploadedLink.innerHTML = ""; // 清除之前的链接
 
         const token = tokenInput.value;
-
-        // 获取文件
         const file = fileInput.files[0];
 
-        // 检查是否选择了文件
         if (!file) {
             uploadPrompt.innerHTML = "请选择文件！";
             return;
         }
-        console.log(token)
+
         if (use_token && !token) {
             uploadPrompt.innerHTML = "请输入token！";
             return;
         }
 
-        // 创建 FormData 对象，用于将文件数据添加到 HTTP 请求中
         const formData = new FormData();
         if (use_token) {
             formData.append("token", token);
         }
         formData.append('file', file);
 
-        // 使用 Axios 发送 POST 请求
         axios.post('UPLOAD', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             }
         }).then(response => {
-            uploadPrompt.innerHTML = "文件上传成功，链接为：" + response.data;
-            console.log("文件上传成功", response);
+            const fileLink = response.data;
+            uploadPrompt.innerHTML = "文件上传成功！";
+            uploadedLink.innerHTML = `<a href="${fileLink}" target="_blank">${fileLink}</a> <button onclick="copyLink('${fileLink}')">复制链接</button>`;
         }).catch(error => {
             if (use_token && error.response.data == "Incorrect token!") {
                 uploadPrompt.innerHTML = "token 不正确！";
-                console.log("token 不正确，文件上传失败");
             } else {
                 uploadPrompt.innerHTML = "文件上传失败: " + error.message || "未知错误";
-                console.error("文件上传失败", error);
             }
         });
     }
@@ -164,7 +138,6 @@ axios.post('UPLOAD', formData, {
     function deleteFile() {
         const deleteInput = document.getElementById('deleteInput');
         const deletePrompt = document.getElementById('deletePrompt');
-        uploadPrompt.innerHTML = "";
         const filename = deleteInput.value;
 
         if (!filename) {
@@ -172,20 +145,26 @@ axios.post('UPLOAD', formData, {
             return;
         }
 
-        axios.post('DELETE', {
-            file: filename,
-        }).then(() => {
-            deletePrompt.innerHTML = "文件已被删除";
-            console.log("文件已被删除：" + filename);
-        }).catch(error => {
-            if (error.response.status == 404) {
-                deletePrompt.innerHTML = "服务器找不到你提供的文件";
-                console.log("文件找不到：" + filename);
-            } else {
-                deletePrompt.innerHTML = "文件删除失败: " + error.message || "未知错误";
-                console.error("文件删除失败", error);
-            }
-        })
+        axios.post('DELETE', { file: filename })
+            .then(() => {
+                deletePrompt.innerHTML = "文件已被删除";
+            })
+            .catch(error => {
+                if (error.response.status == 404) {
+                    deletePrompt.innerHTML = "服务器找不到你提供的文件";
+                } else {
+                    deletePrompt.innerHTML = "文件删除失败: " + error.message || "未知错误";
+                }
+            });
+    }
+
+    function copyLink(link) {
+        // 使用Clipboard API复制链接
+        navigator.clipboard.writeText(link).then(() => {
+            alert('链接已复制！');
+        }).catch(err => {
+            alert('复制失败: ' + err);
+        });
     }
 </script>
 
