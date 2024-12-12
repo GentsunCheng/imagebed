@@ -125,7 +125,7 @@ axios.post('UPLOAD', formData, {
         }).then(response => {
             const fileLink = response.data;
             uploadPrompt.innerHTML = "文件上传成功！";
-            uploadedLink.innerHTML = `<a href="${fileLink}" target="_blank">${fileLink}</a> <button onclick="copyLink('${fileLink}')">复制链接</button>`;
+            uploadedLink.innerHTML = `<a href="${fileLink}" target="_blank">${fileLink}</a> <button type="button" onclick="copyLink('${fileLink}')">复制链接</button>`;
         }).catch(error => {
             if (use_token && error.response.data == "Incorrect token!") {
                 uploadPrompt.innerHTML = "token 不正确！";
