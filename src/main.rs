@@ -208,7 +208,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
 }
 
 // 存在于白名单中的文件将被认为存放在www_root下，而不是www_root/file下
-const FILE_WHITELIST: [&'static str; 2] = ["favicon.ico", "style.css"];
+const FILE_WHITELIST: [&'static str; 2] = ["favicon.ico", "style.css", "CircularBody.woff"];
 
 #[get("/{filename}")]
 async fn get_file(data: web::Data<AppState>, filename: web::Path<String>) -> impl Responder {
